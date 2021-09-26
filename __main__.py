@@ -1,10 +1,18 @@
 import requests
 import os
+import logging
 
 from dotenv import load_dotenv
 from discord.ext import commands
 from discord.ext import tasks
 from bs4 import BeautifulSoup
+
+logging.basicConfig(
+    filename='console.log', 
+    encoding='utf-8', 
+    level=logging.DEBUG,
+    format='%(asctime)s %(message)s'
+)
 
 bot = commands.Bot(command_prefix='!!')
 bot.remove_command('check')
@@ -15,35 +23,41 @@ class PollubScheduleSearcher(commands.Cog):
         self.source_url = 'http://www.wm.pollub.pl/pl/studenci/plany-zajec'
         self.check_loop.start()
         self.old_url = ""
+        logging.info("[PSS] Program intialized")
 
-    @commands.command()
-    async def check(self, context):
+    @tasks.loop(seconds=10)
+    async def check_loop(self):
         await self.check_updates()
 
     @commands.command()
     async def set_channel(self, context):
         self.main_channel = context
-        print("[PSS] Channel has been selected")
+        logging.info("[PSS] Channel has been selected", )
         await context.send("Channel has been selected")
         await self.check_updates()
 
-    @tasks.loop(minutes=30)
-    async def check_loop(self):
-        await self.check_updates()
+    @commands.command()
+    async def check(self, context):
+        old_url = self.old_url if self.old_url != "" else "NO URL"
+        await context.send(
+            "Aktualna wersja planu zajęć:\n" + self.get_url() + "\n\n"
+            "Zapisana wersja planu zajęć:\n" + old_url
+        )
+        logging.info("[PSS] Manual check executed")
 
     async def check_updates(self):
         if not hasattr(self, 'main_channel'):
             return
 
-        print("[PSS] Check executed")
+        logging.info("[PSS] Check executed")
         new_url = self.get_url()
         if new_url != self.old_url:
             if self.old_url == "":
                 self.old_url = new_url
-                print("[PSS] Initialized; first URL has been found")
+                logging.info("[PSS] Initialized; first URL has been found")
                 return
 
-            print("[PSS] Found new schedule")
+            logging.info("[PSS] Found new schedule")
             await self.main_channel.send(
                 "Hej, jakiś cwel wrzucił właśnie nową wersję planu zajęć mechatro\n\n"
                 "Nowa wersja planu zajęć:\n" + new_url + "\n\n"
